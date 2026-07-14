@@ -32,7 +32,7 @@ const TournamentsView: React.FC<TournamentsViewProps> = ({ type }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [resetModalOpen, setResetModalOpen] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState('');
-  const [draggedTeamId, setDraggedTeamId] = useState<string | null>(null);
+  const [, setDraggedTeamId] = useState<string | null>(null);
   const [activeSearchGroup, setActiveSearchGroup] = useState<string | null>(null);
   const [groupSearchTerm, setGroupSearchTerm] = useState('');
   const [focusedSearchResultIndex, setFocusedSearchResultIndex] = useState(0);
