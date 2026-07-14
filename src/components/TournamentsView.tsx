@@ -23,7 +23,7 @@ interface TournamentData {
 }
 
 const TournamentsView: React.FC<TournamentsViewProps> = ({ type }) => {
-  const { user, userData, loading } = useAuth();
+  const { user, userData } = useAuth();
   const [nationalTeams, setNationalTeams] = useState<NationalTeam[]>([]);
   const [tournamentData, setTournamentData] = useState<TournamentData>({});
   

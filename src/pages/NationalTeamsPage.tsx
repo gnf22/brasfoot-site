@@ -378,6 +378,7 @@ const NationalTeamsPage: React.FC = () => {
   };
 
   const handleSeedFIFATeams = async () => {
+      (window as any).handleSeedFIFATeams = handleSeedFIFATeams;
       const confirmSeed = window.confirm('Isso adicionará seleções da FIFA ao banco de dados. Deseja continuar?');
       if (!confirmSeed) return;
 

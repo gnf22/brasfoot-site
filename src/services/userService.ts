@@ -7,6 +7,7 @@ export interface UserData {
   email: string;
   photoURL: string;
   teamId: string | null;
+  nationalTeamId?: string | null;
 }
 
 export const checkAndAddUser = async (user: any): Promise<UserData> => {
