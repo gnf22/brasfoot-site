@@ -138,6 +138,26 @@ const NationalTeamsPage: React.FC = () => {
     }
     setProcessing(false);
   };
+
+  const handleDeleteTeam = async () => {
+    if (!editingTeam) return;
+    const confirm = window.confirm(`Tem certeza que deseja excluir a seleção "${editingTeam.name}"? Esta ação não pode ser desfeita.`);
+    if (!confirm) return;
+
+    setProcessing(true);
+    try {
+      if (editingTeam.ownerId) {
+        const userRef = doc(db, 'users', editingTeam.ownerId);
+        await updateDoc(userRef, { nationalTeamId: null });
+      }
+      const teamRef = doc(db, 'national_teams', editingTeam.id);
+      await deleteDoc(teamRef);
+      closeEditModal();
+    } catch (error) {
+      console.error(error);
+    }
+    setProcessing(false);
+  };
   
   const openEditModal = (team: NationalTeam) => {
     setEditingTeam(team);
@@ -302,6 +322,10 @@ const NationalTeamsPage: React.FC = () => {
   const handleDragLeave = (e: React.DragEvent) => {
     const target = e.currentTarget as HTMLElement;
     target.classList.remove('drag-over');
+  };
+
+  const handleMoveTeam = (team: NationalTeam, isActiveColumn: boolean) => {
+    setDndTeams(prev => prev.map(t => t.id === team.id ? { ...t, isActive: isActiveColumn } : t));
   };
 
   const saveManagedTeams = async () => {
@@ -767,13 +791,18 @@ const NationalTeamsPage: React.FC = () => {
                   ))}
                 </select>
               </div>
-              <div className="modal-actions">
-                <button type="button" className="btn-secondary" onClick={closeEditModal} disabled={processing}>
-                  Cancelar
+              <div className="modal-actions" style={{ justifyContent: 'space-between' }}>
+                <button type="button" className="btn-danger" onClick={handleDeleteTeam} disabled={processing}>
+                  Excluir
                 </button>
-                <button type="submit" className="btn-primary" disabled={processing}>
-                  Salvar Alterações
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="button" className="btn-secondary" onClick={closeEditModal} disabled={processing}>
+                    Cancelar
+                  </button>
+                  <button type="submit" className="btn-primary" disabled={processing}>
+                    Salvar Alterações
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -827,7 +856,16 @@ const NationalTeamsPage: React.FC = () => {
                     onDragEnd={handleDragEnd}
                   >
                     <img src={team.logoUrl} alt={team.name} />
-                    <span>{team.name} {team.ownerName ? `(${team.ownerName})` : ''}</span>
+                    <span style={{flex: 1}}>{team.name} {team.ownerName ? `(${team.ownerName})` : ''}</span>
+                    <button 
+                      type="button" 
+                      className="btn-danger"
+                      style={{ padding: '2px 8px', fontSize: '1.2rem' }}
+                      onClick={() => handleMoveTeam(team, false)}
+                      title="Desativar"
+                    >
+                      ↓
+                    </button>
                   </div>
                 ))}
               </div>
@@ -851,7 +889,16 @@ const NationalTeamsPage: React.FC = () => {
                     onDragEnd={handleDragEnd}
                   >
                     <img src={team.logoUrl} alt={team.name} />
-                    <span>{team.name}</span>
+                    <span style={{flex: 1}}>{team.name}</span>
+                    <button 
+                      type="button" 
+                      className="btn-primary"
+                      style={{ padding: '2px 8px', fontSize: '1.2rem' }}
+                      onClick={() => handleMoveTeam(team, true)}
+                      title="Ativar"
+                    >
+                      ↑
+                    </button>
                   </div>
                 ))}
               </div>

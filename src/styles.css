@@ -634,6 +634,8 @@ button {
   background: var(--bg-color);
   padding: 4px;
   border-radius: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .nav-tab {
@@ -646,6 +648,7 @@ button {
   border: none;
   cursor: pointer;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
 .nav-tab:hover {
