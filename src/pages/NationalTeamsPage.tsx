@@ -4,6 +4,7 @@ import { db } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import AlertModal, { AlertMessage } from '../components/AlertModal';
+import { createNewsItem, getAdminExpulsionNews } from '../services/seasonService';
 import { nationalTeamsCache, usersCache, globalSettingsCache } from '../services/cacheService';
 
 interface NationalTeam {
@@ -221,6 +222,21 @@ const NationalTeamsPage: React.FC = () => {
       const userRef = doc(db, 'users', team.ownerId);
       await updateDoc(teamRef, { ownerId: null, ownerName: null, ownerPhoto: null });
       await updateDoc(userRef, { nationalTeamId: null });
+
+      if (team.ownerName) {
+        const ownerObj = allUsers.find(u => u.id === team.ownerId);
+        const newsItem = getAdminExpulsionNews(
+          team.ownerName,
+          team.name,
+          new Date().getFullYear(),
+          {
+            coachPhotoUrl: team.ownerPhoto || ownerObj?.photoURL || undefined,
+            teamLogoUrl: team.logoUrl,
+            prestige: ownerObj?.prestige
+          }
+        );
+        await createNewsItem(newsItem);
+      }
     } catch (error) {
       console.error(error);
     }
@@ -487,7 +503,22 @@ const NationalTeamsPage: React.FC = () => {
     setProcessing(true);
     try {
       if (currentTeamId) {
+        const t = teams.find(tm => tm.id === currentTeamId);
+        const u = allUsers.find(x => x.id === userId);
         await updateDoc(doc(db, 'national_teams', currentTeamId), { ownerId: null, ownerName: null, ownerPhoto: null });
+        if (t && u) {
+          const newsItem = getAdminExpulsionNews(
+            u.name,
+            t.name,
+            new Date().getFullYear(),
+            {
+              coachPhotoUrl: u.photoURL || undefined,
+              teamLogoUrl: t.logoUrl,
+              prestige: u.prestige
+            }
+          );
+          await createNewsItem(newsItem);
+        }
       }
       const u = allUsers.find(u => u.id === userId);
       if (u?.teamId) {
@@ -512,8 +543,22 @@ const NationalTeamsPage: React.FC = () => {
       for (const userId of selectedUsers) {
         const u = allUsers.find(x => x.id === userId);
         if (u && u.nationalTeamId) {
+          const t = teams.find(tm => tm.id === u.nationalTeamId);
           await updateDoc(doc(db, 'national_teams', u.nationalTeamId), { ownerId: null, ownerName: null, ownerPhoto: null });
           await updateDoc(doc(db, 'users', userId), { nationalTeamId: null });
+          if (t) {
+            const newsItem = getAdminExpulsionNews(
+              u.name,
+              t.name,
+              new Date().getFullYear(),
+              {
+                coachPhotoUrl: u.photoURL || undefined,
+                teamLogoUrl: t.logoUrl,
+                prestige: u.prestige
+              }
+            );
+            await createNewsItem(newsItem);
+          }
         }
       }
       setSelectedUsers([]);

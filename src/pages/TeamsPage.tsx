@@ -4,7 +4,7 @@ import { db } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import TournamentsView from '../components/TournamentsView';
-import { SeasonData, NewsItem, updateSeasonYear, createNewsItem, getRandomTransferNews, getRandomResignationNews, calculateGoalXP, formatGoalName } from '../services/seasonService';
+import { SeasonData, NewsItem, updateSeasonYear, createNewsItem, getRandomTransferNews, getRandomResignationNews, getAdminExpulsionNews, calculateGoalXP, formatGoalName } from '../services/seasonService';
 import NewsFeed from '../components/NewsFeed';
 import SeasonEndModal from '../components/SeasonEndModal';
 import SeasonReportModal from '../components/SeasonReportModal';
@@ -362,6 +362,21 @@ const TeamsPage: React.FC = () => {
       const userRef = doc(db, 'users', team.ownerId);
       await updateDoc(teamRef, { ownerId: null, ownerName: null, ownerPhoto: null });
       await updateDoc(userRef, { [userField]: null });
+
+      if (team.ownerName) {
+        const ownerObj = allUsers.find(u => u.id === team.ownerId);
+        const newsItem = getAdminExpulsionNews(
+          team.ownerName,
+          team.name,
+          season.currentYear,
+          {
+            coachPhotoUrl: team.ownerPhoto || ownerObj?.photoURL || undefined,
+            teamLogoUrl: team.logoUrl,
+            prestige: ownerObj?.prestige
+          }
+        );
+        await createNewsItem(newsItem);
+      }
     } catch (error) {
       console.error(error);
     }
@@ -719,8 +734,24 @@ const TeamsPage: React.FC = () => {
     setProcessing(true);
     try {
       const coll = currentView === 'clubes' ? 'teams' : 'national_teams';
+      const allTeamsList = [...teams, ...nationalTeams];
       if (currentTeamId) {
+        const t = allTeamsList.find((tm: Team) => tm.id === currentTeamId);
+        const u = allUsers.find(x => x.id === userId);
         await updateDoc(doc(db, coll, currentTeamId), { ownerId: null, ownerName: null, ownerPhoto: null });
+        if (t && u) {
+          const newsItem = getAdminExpulsionNews(
+            u.name,
+            t.name,
+            season.currentYear,
+            {
+              coachPhotoUrl: u.photoURL || undefined,
+              teamLogoUrl: t.logoUrl,
+              prestige: u.prestige
+            }
+          );
+          await createNewsItem(newsItem);
+        }
       }
       await deleteDoc(doc(db, 'users', userId));
       setSelectedUsers(prev => prev.filter(id => id !== userId));
@@ -739,11 +770,26 @@ const TeamsPage: React.FC = () => {
     try {
       const coll = currentView === 'clubes' ? 'teams' : 'national_teams';
       const userField = currentView === 'clubes' ? 'teamId' : 'nationalTeamId';
+      const allTeamsList = [...teams, ...nationalTeams];
       for (const userId of selectedUsers) {
         const u = allUsers.find(x => x.id === userId);
         if (u && u[userField]) {
+          const t = allTeamsList.find((tm: Team) => tm.id === u[userField]);
           await updateDoc(doc(db, coll, u[userField]), { ownerId: null, ownerName: null, ownerPhoto: null });
           await updateDoc(doc(db, 'users', userId), { [userField]: null });
+          if (t) {
+            const newsItem = getAdminExpulsionNews(
+              u.name,
+              t.name,
+              season.currentYear,
+              {
+                coachPhotoUrl: u.photoURL || undefined,
+                teamLogoUrl: t.logoUrl,
+                prestige: u.prestige
+              }
+            );
+            await createNewsItem(newsItem);
+          }
         }
       }
       setSelectedUsers([]);
