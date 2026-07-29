@@ -502,14 +502,21 @@ const TeamsPage: React.FC = () => {
         })
       ]);
 
-      if (currentView === 'clubes') {
-        createNewsItem(
-          getRandomTransferNews(winnerUserObj.name, team.name, season.currentYear, {
-            coachPhotoUrl: winnerUserObj.photoURL || '',
-            teamLogoUrl: team.logoUrl || '',
+      try {
+        const newsItem = getRandomTransferNews(
+          winnerUserObj.name || 'Treinador',
+          team.name || 'Clube',
+          season?.currentYear || new Date().getFullYear() || 2026,
+          {
+            coachPhotoUrl: winnerUserObj.photoURL || undefined,
+            teamLogoUrl: team.logoUrl || undefined,
             prestige: winnerUserObj.prestige ?? 70
-          })
+          }
         );
+        await createNewsItem(newsItem);
+        console.log("Notícia de transferência criada com sucesso:", newsItem);
+      } catch (newsError) {
+        console.error("Erro ao criar notícia de assinar (TeamsPage handleAprovarUnico):", newsError);
       }
     } catch (error: any) {
       console.error(error);
@@ -714,9 +721,42 @@ const TeamsPage: React.FC = () => {
        }
        
        if (newTeamId && targetTeam && userObj) {
+          try {
+            const newsItem = getRandomTransferNews(
+              userObj.name || 'Treinador',
+              targetTeam.name || 'Clube',
+              season?.currentYear || new Date().getFullYear() || 2026,
+              {
+                coachPhotoUrl: userObj.photoURL || undefined,
+                teamLogoUrl: targetTeam.logoUrl || undefined,
+                prestige: userObj.prestige ?? 70
+              }
+            );
+            await createNewsItem(newsItem);
+          } catch (ne) {
+            console.error("Erro ao gerar notícia de transferência no reassign:", ne);
+          }
           await updateDoc(doc(db, coll, newTeamId), { ownerId: userId, ownerName: userObj.name, ownerPhoto: userObj.photoURL || null });
           await updateDoc(userRef, { [userField]: newTeamId });
        } else if (newTeamId === 'remove') {
+          if (currentTeamId && userObj) {
+            const sourceTeam = sourceTeams.find(t => t.id === currentTeamId);
+            try {
+              const newsItem = getRandomResignationNews(
+                userObj.name || 'Treinador',
+                sourceTeam?.name || 'Clube',
+                season?.currentYear || new Date().getFullYear() || 2026,
+                {
+                  coachPhotoUrl: userObj.photoURL || undefined,
+                  teamLogoUrl: sourceTeam?.logoUrl || undefined,
+                  prestige: userObj.prestige ?? 70
+                }
+              );
+              await createNewsItem(newsItem);
+            } catch (ne) {
+              console.error("Erro ao gerar notícia de saída no reassign:", ne);
+            }
+          }
           await updateDoc(userRef, { [userField]: null });
        }
     } catch(e){

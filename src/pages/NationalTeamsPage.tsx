@@ -4,7 +4,7 @@ import { db } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import AlertModal, { AlertMessage } from '../components/AlertModal';
-import { createNewsItem, getAdminExpulsionNews } from '../services/seasonService';
+import { createNewsItem, getAdminExpulsionNews, getRandomTransferNews } from '../services/seasonService';
 import { nationalTeamsCache, usersCache, globalSettingsCache } from '../services/cacheService';
 
 interface NationalTeam {
@@ -317,6 +317,22 @@ const NationalTeamsPage: React.FC = () => {
           declaredInterestTeamId: null
         })
       ]);
+
+      try {
+        const newsItem = getRandomTransferNews(
+          winnerUserObj.name || 'Treinador',
+          team.name || 'Seleção',
+          new Date().getFullYear(),
+          {
+            coachPhotoUrl: winnerUserObj.photoURL || undefined,
+            teamLogoUrl: team.logoUrl || undefined,
+            prestige: winnerUserObj.prestige ?? 70
+          }
+        );
+        await createNewsItem(newsItem);
+      } catch (ne) {
+        console.error("Erro ao criar notícia de assinar em Seleção:", ne);
+      }
     } catch (error: any) {
       console.error(error);
       setAlertMsg({ title: 'Erro', message: 'Erro ao aprovar treinador.', type: 'error' });

@@ -4,6 +4,7 @@ import { db } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import AlertModal, { AlertMessage } from './AlertModal';
 import { nationalTeamsCache, usersCache, globalSettingsCache } from '../services/cacheService';
+import { createNewsItem, getRandomTransferNews } from '../services/seasonService';
 
 export interface NationalTeam {
   id: string;
@@ -290,6 +291,22 @@ const TournamentsView: React.FC<TournamentsViewProps> = ({ type }) => {
           declaredInterestTeamId: null
         })
       ]);
+
+      try {
+        const newsItem = getRandomTransferNews(
+          winnerUserObj.name || 'Treinador',
+          team.name || 'Seleção',
+          new Date().getFullYear(),
+          {
+            coachPhotoUrl: winnerUserObj.photoURL || undefined,
+            teamLogoUrl: team.logoUrl || undefined,
+            prestige: winnerUserObj.prestige ?? 70
+          }
+        );
+        await createNewsItem(newsItem);
+      } catch (ne) {
+        console.error("Erro ao criar notícia de assinar em Torneio:", ne);
+      }
     } catch (error: any) {
       console.error(error);
       setAlertMsg({ title: 'Erro', message: 'Erro ao aprovar treinador.', type: 'error' });
