@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
+import { createNewsItem, getRandomDisputeWinnerNews } from '../services/seasonService';
 
 export interface DiceParticipant {
   uid: string;
@@ -140,6 +141,19 @@ const DiceRollModal: React.FC = () => {
                 const loserRef = doc(db, 'users', loser.uid);
                 await updateDoc(loserRef, { declaredInterestTeamId: null });
              }
+
+             const loserNames = losers.map(p => p.name);
+             const newsItem = getRandomDisputeWinnerNews(
+               winner.name,
+               diceEvent.teamName,
+               loserNames,
+               new Date().getFullYear(),
+               {
+                 coachPhotoUrl: winner.photoURL || undefined,
+                 teamLogoUrl: diceEvent.teamLogoUrl || undefined
+               }
+             );
+             await createNewsItem(newsItem);
           }
         } catch (error) {
           console.error("Error assigning winner:", error);

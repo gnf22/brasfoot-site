@@ -283,6 +283,18 @@ export const getRandomTransferNews = (
     {
       title: `FECHADO! ${coachName} é o novo comandante técnico do ${teamName}!`,
       content: `O acordo entre ${coachName} e ${teamName} foi sacramentado hoje. O treinador prometeu empenho total na temporada ${year}.`
+    },
+    {
+      title: `EM BOA HORA! ${teamName} acerta com ${coachName} para grande temporada!`,
+      content: `A torcida do ${teamName} já tem motivos para comemorar. A diretoria confirmou a assinatura de contrato com o técnico ${coachName} para os desafios de ${year}.`
+    },
+    {
+      title: `REFORÇO NA COMISSÃO! ${coachName} é apresentado pelo ${teamName}!`,
+      content: `O departamento de futebol profissional do ${teamName} apresentou hoje o técnico ${coachName}. O treinador iniciou o planejamento do elenco para ${year}.`
+    },
+    {
+      title: `PRANCHETA NOVA! ${teamName} aposta em ${coachName} para ${year}!`,
+      content: `Com discurso otimista e projeto ambicioso, o ${teamName} revelou que ${coachName} será o grande responsável por comandar o time nesta temporada.`
     }
   ];
   const choice = variations[Math.floor(Math.random() * variations.length)];
@@ -291,6 +303,66 @@ export const getRandomTransferNews = (
     type: 'transfer',
     date: `Temporada ${year}`,
     coachName,
+    teamName,
+    coachPhotoUrl: meta?.coachPhotoUrl,
+    teamLogoUrl: meta?.teamLogoUrl,
+    prestige: meta?.prestige,
+    years: meta?.years
+  };
+};
+
+export const getRandomDisputeWinnerNews = (
+  winnerName: string,
+  teamName: string,
+  loserNames: string[],
+  year: number,
+  meta?: { coachPhotoUrl?: string; teamLogoUrl?: string; prestige?: number; years?: number }
+): NewsItem => {
+  const formatLosers = (names: string[]): string => {
+    if (!names || names.length === 0) return 'outros concorrentes';
+    if (names.length === 1) return names[0];
+    if (names.length === 2) return `${names[0]} e ${names[1]}`;
+    return `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`;
+  };
+
+  const formattedLosers = formatLosers(loserNames);
+
+  const variations = [
+    {
+      title: `MARTELO BATIDO! ${teamName} opta por ${winnerName} e supera concorrência de peso!`,
+      content: `A diretoria do ${teamName} colocou fim à novela nos bastidores e oficializou a contratação do técnico ${winnerName} para a temporada ${year}. O clube optou pelo treinador em detrimento de ${formattedLosers}, que também estavam no páreo pelo comando da equipe.`
+    },
+    {
+      title: `ESCOLHIDO! ${winnerName} desbanca concorrentes e assume o ${teamName}!`,
+      content: `Após minuciosa avaliação de projetos esportivos, o ${teamName} definiu seu novo comandante para ${year}: ${winnerName}. A preferência da diretoria pelo treinador acabou preterindo nomes que disputavam fortemente a vaga, como ${formattedLosers}.`
+    },
+    {
+      title: `FIM DO MISTÉRIO! ${teamName} prefere ${winnerName} no comando técnico!`,
+      content: `A concorrência pela prancheta do ${teamName} chegou ao fim. Em nota oficial, o clube confirmou que optou por assinar com ${winnerName}. Com a decisão da diretoria, ${formattedLosers} ficam fora dos planos da equipe para a temporada ${year}.`
+    },
+    {
+      title: `DEFINIDO! ${teamName} escolhe ${winnerName} em disputa acirrada de bastidores!`,
+      content: `O mercado da bola pegou fogo nas últimas horas. Entre vários candidatos interessados no cargo, o ${teamName} oficializou a escolha do técnico ${winnerName} para ${year}, superando a concorrência direta de ${formattedLosers}.`
+    },
+    {
+      title: `ACORDO FECHADO! ${winnerName} ganha braço de ferro e é o novo treinador do ${teamName}!`,
+      content: `A cúpula diretiva do ${teamName} bateu o martelo e selecionou ${winnerName} para liderar o elenco na temporada ${year}. A preferência pelo comandante foi decisiva para superar o interesse manifestado por ${formattedLosers}.`
+    },
+    {
+      title: `OFICIAL: ${teamName} anuncia ${winnerName} e encerra concorrência pela prancheta!`,
+      content: `O ${teamName} tem novo treinador: trata-se de ${winnerName}. A contratação marca o desfecho de uma busca concorrida em ${year}, na qual a diretoria optou pelo perfil de ${winnerName} em vez de ${formattedLosers}.`
+    },
+    {
+      title: `PREFERÊNCIA DO CLUBE! ${winnerName} assina com o ${teamName} após superar rivais!`,
+      content: `A diretoria de futebol do ${teamName} oficializou o vínculo com ${winnerName} para a temporada ${year}. Nos bastidores, a chegada do treinador concretiza a escolha do clube sobre ${formattedLosers}, que também ambicionavam o cargo.`
+    }
+  ];
+  const choice = variations[Math.floor(Math.random() * variations.length)];
+  return {
+    ...choice,
+    type: 'transfer',
+    date: `Temporada ${year}`,
+    coachName: winnerName,
     teamName,
     coachPhotoUrl: meta?.coachPhotoUrl,
     teamLogoUrl: meta?.teamLogoUrl,
@@ -368,6 +440,18 @@ export const getRandomFiredNews = (
     {
       title: `DEMITIDO! ${coachName} não resiste à pressão no ${teamName}!`,
       content: `O conselho deliberativo bateu o martelo. A queda de prestígio para ${xp} pts inviabilizou a continuidade de ${coachName} para a próxima temporada.`
+    },
+    {
+      title: `MUDANÇA RUMOS! ${teamName} desliga ${coachName} do comando!`,
+      content: `Insatisfeita com os resultados apresentados em ${year}, a cúpula do ${teamName} optou pela demissão do treinador, que encerrou o ano com ${xp} pts de prestígio.`
+    },
+    {
+      title: `CRISE E QUEDA! ${coachName} tem contrato rescindido pelo ${teamName}!`,
+      content: `O ambiente pesado e os tropeços em ${year} custaram o cargo de ${coachName}. O clube emitiu nota comunicando a dispensa do comandante.`
+    },
+    {
+      title: `NÃO FICARÁ! ${teamName} opta por demitir ${coachName} ao fim da temporada!`,
+      content: `A reformulação no ${teamName} começou pela comissão técnica. Com desempenho aquém das metas e ${xp} pts de prestígio, ${coachName} deixa o clube.`
     }
   ];
   const choice = variations[Math.floor(Math.random() * variations.length)];
@@ -406,6 +490,18 @@ export const getAdminExpulsionNews = (
     {
       title: `CANETADA DA CGF! ${coachName} é expulso do comando do ${teamName}!`,
       content: `A presidência e comissão administrativa da CGF (Confederação Gustavo de Futebol) decretou o desligamento oficial de ${coachName} do ${teamName}. A diretoria do clube aguarda definições para anunciar seu novo treinador.`
+    },
+    {
+      title: `DECRETO DA PRESIDÊNCIA! CGF desliga ${coachName} do ${teamName}!`,
+      content: `Em medida administrativa de impacto, a Confederação Gustavo de Futebol (CGF) cassou o vínculo do técnico ${coachName} à frente do ${teamName} na temporada ${year}.`
+    },
+    {
+      title: `FORA DO CLUBE! CGF determina saída imediata de ${coachName} no ${teamName}!`,
+      content: `O boletim extraordinário publicado pela CGF informou que ${coachName} não responde mais pela comissão técnica do ${teamName} em ${year}.`
+    },
+    {
+      title: `ATRAVÉS DE RESOLUÇÃO, CGF destitui ${coachName} do comando do ${teamName}!`,
+      content: `Por ato executivo da Confederação Gustavo de Futebol, a passagem de ${coachName} pelo ${teamName} foi encerrada oficialmente.`
     }
   ];
   const choice = variations[Math.floor(Math.random() * variations.length)];
@@ -449,6 +545,18 @@ export const getRandomRenewalNews = (
     {
       title: `ACORDO PRORROGADO! ${coachName} fica no comando do ${teamName}!`,
       content: `A diretoria não poupou elogios ao trabalho de ${coachName} na temporada ${year}. O novo contrato é válido até ${year + years}!`
+    },
+    {
+      title: `MAIS TEMPO DE CASA! ${coachName} assina renovação no ${teamName}!`,
+      content: `O trabalho que vem sendo desenvolvido por ${coachName} convenceu a diretoria. O treinador assinou por mais ${years} ${years === 1 ? 'ano' : 'anos'}.`
+    },
+    {
+      title: `PLANEJAMENTO DE LONGO PRAZO! ${teamName} estende vínculo de ${coachName}!`,
+      content: `Com confiança mútua, ${coachName} e a diretoria do ${teamName} firmaram acordo de renovação por mais ${years} ${years === 1 ? 'temporada' : 'temporadas'}.`
+    },
+    {
+      title: `FICA NO CLUBE! ${coachName} acerta permanência e renova com o ${teamName}!`,
+      content: `Fim dos rumores: ${coachName} não sai do ${teamName}! O clube confirmou a ampliação do contrato até ${year + years}.`
     }
   ];
   const choice = variations[Math.floor(Math.random() * variations.length)];

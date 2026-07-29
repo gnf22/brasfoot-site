@@ -375,7 +375,7 @@ const SeasonReportModal: React.FC<SeasonReportModalProps> = ({ report, teams, al
                   }}
                 >
                   {report.type === 'transfer'
-                    ? `${coachName} é o novo comandante do ${teamName} (Foto: Divulgação/Grêmio)`
+                    ? `${coachName} é o novo comandante do ${teamName} (Foto: Divulgação/${teamName})`
                     : report.type === 'resignation'
                     ? `${coachName} deixa o comando oficial do ${teamName} (Foto: Divulgação/FutNews)`
                     : `${coachName} em coletiva de imprensa no ${teamName} (Foto: Divulgação/FutNews)`}
