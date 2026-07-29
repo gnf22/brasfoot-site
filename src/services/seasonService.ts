@@ -318,11 +318,12 @@ export const getRandomDisputeWinnerNews = (
   year: number,
   meta?: { coachPhotoUrl?: string; teamLogoUrl?: string; prestige?: number; years?: number }
 ): NewsItem => {
-  const formatLosers = (names: string[]): string => {
-    if (!names || names.length === 0) return 'outros concorrentes';
-    if (names.length === 1) return names[0];
-    if (names.length === 2) return `${names[0]} e ${names[1]}`;
-    return `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`;
+  const formatLosers = (names?: string[]): string => {
+    const cleanNames = (names || []).filter(n => n && typeof n === 'string' && n.trim() !== '' && n !== 'Desconhecido');
+    if (!cleanNames || cleanNames.length === 0) return 'outros concorrentes';
+    if (cleanNames.length === 1) return cleanNames[0];
+    if (cleanNames.length === 2) return `${cleanNames[0]} e ${cleanNames[1]}`;
+    return `${cleanNames.slice(0, -1).join(', ')} e ${cleanNames[cleanNames.length - 1]}`;
   };
 
   const formattedLosers = formatLosers(loserNames);

@@ -114,46 +114,72 @@ const DiceRollModal: React.FC = () => {
         // Automatically assign winner to team and free up others
         setAssigningWinner(true);
         try {
-          const teamRef = doc(db, diceEvent.collectionType, diceEvent.teamId);
-          const winnerRef = doc(db, 'users', winner.uid);
+          const losers = updatedParticipants.filter(p => p.uid !== winner.uid);
+          const loserNames = losers.map(p => p.name).filter(Boolean);
           
-          const teamDoc = await getDoc(teamRef);
+          try {
+            const newsItem = getRandomDisputeWinnerNews(
+              winner.name || 'Treinador',
+              diceEvent.teamName || 'Clube',
+              loserNames,
+              new Date().getFullYear(),
+              {
+                coachPhotoUrl: winner.photoURL || undefined,
+                teamLogoUrl: diceEvent.teamLogoUrl || undefined
+              }
+            );
+            await createNewsItem(newsItem);
+            console.log("Notícia de disputa do sorteio criada com sucesso:", newsItem);
+          } catch (newsError) {
+            console.error("Erro ao criar notícia de disputa do sorteio:", newsError);
+          }
+
+          let collectionType = diceEvent.collectionType || 'teams';
+          let teamRef = doc(db, collectionType, diceEvent.teamId);
+          let teamDoc = await getDoc(teamRef);
+          if (!teamDoc.exists()) {
+            collectionType = 'national_teams';
+            teamRef = doc(db, collectionType, diceEvent.teamId);
+            teamDoc = await getDoc(teamRef);
+          }
+
           if (teamDoc.exists()) {
-             const userField = diceEvent.collectionType === 'teams' ? 'teamId' : 'nationalTeamId';
+             const userField = collectionType === 'teams' ? 'teamId' : 'nationalTeamId';
              
              // Update team
-             await updateDoc(teamRef, {
-                ownerId: winner.uid,
-                ownerName: winner.name,
-                ownerPhoto: winner.photoURL || null,
-                interestedUsers: [] // clear interested
-             });
+             try {
+               await updateDoc(teamRef, {
+                  ownerId: winner.uid,
+                  ownerName: winner.name,
+                  ownerPhoto: winner.photoURL || null,
+                  interestedUsers: [] // clear interested
+               });
+             } catch (e) {
+               console.error("Erro ao atualizar time no sorteio:", e);
+             }
              
              // Update winner user doc
-             await updateDoc(winnerRef, {
-                [userField]: diceEvent.teamId,
-                declaredInterestTeamId: null
-             });
+             try {
+               const winnerRef = doc(db, 'users', winner.uid);
+               await updateDoc(winnerRef, {
+                  [userField]: diceEvent.teamId,
+                  declaredInterestTeamId: null
+               });
+             } catch (e) {
+               console.error("Erro ao atualizar vencedor no sorteio:", e);
+             }
              
              // Update losers user docs (clear declaredInterestTeamId)
-             const losers = updatedParticipants.filter(p => p.uid !== winner.uid);
              for(const loser of losers) {
-                const loserRef = doc(db, 'users', loser.uid);
-                await updateDoc(loserRef, { declaredInterestTeamId: null });
+                try {
+                  const loserRef = doc(db, 'users', loser.uid);
+                  await updateDoc(loserRef, { declaredInterestTeamId: null });
+                } catch (e) {
+                  console.error("Erro ao atualizar perdedor no sorteio:", e);
+                }
              }
-
-             const loserNames = losers.map(p => p.name);
-             const newsItem = getRandomDisputeWinnerNews(
-               winner.name,
-               diceEvent.teamName,
-               loserNames,
-               new Date().getFullYear(),
-               {
-                 coachPhotoUrl: winner.photoURL || undefined,
-                 teamLogoUrl: diceEvent.teamLogoUrl || undefined
-               }
-             );
-             await createNewsItem(newsItem);
+          } else {
+             console.error("Time não encontrado no Firestore para o sorteio:", diceEvent.teamId);
           }
         } catch (error) {
           console.error("Error assigning winner:", error);
