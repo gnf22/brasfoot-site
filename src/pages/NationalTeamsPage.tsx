@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { collection, addDoc, updateDoc, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
+import AlertModal, { AlertMessage } from '../components/AlertModal';
+import { nationalTeamsCache, usersCache, globalSettingsCache } from '../services/cacheService';
 
 interface NationalTeam {
   id: string;
@@ -12,7 +14,12 @@ interface NationalTeam {
   ownerId: string | null;
   ownerName: string | null;
   ownerPhoto: string | null;
+  color?: string;
+  secondaryColor?: string;
   isActive?: boolean;
+  interestedUsers?: string[];
+  contractYears?: number;
+  contractStartYear?: number;
 }
 
 const CONFEDERATIONS = ['AFC', 'CAF', 'CONCACAF', 'CONMEBOL', 'OFC', 'UEFA'];
@@ -20,6 +27,7 @@ const CONFEDERATIONS = ['AFC', 'CAF', 'CONCACAF', 'CONMEBOL', 'OFC', 'UEFA'];
 const NationalTeamsPage: React.FC = () => {
   const { user, userData, loading, logout } = useAuth();
   const navigate = useNavigate();
+  const [alertMsg, setAlertMsg] = useState<AlertMessage | null>(null);
   const [teams, setTeams] = useState<NationalTeam[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   
@@ -28,14 +36,19 @@ const NationalTeamsPage: React.FC = () => {
   const [manageTeamsModalOpen, setManageTeamsModalOpen] = useState(false);
   const [manageUsersModalOpen, setManageUsersModalOpen] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [coachSearchTerm, setCoachSearchTerm] = useState('');
   
   const [newTeamName, setNewTeamName] = useState('');
   const [newTeamLogo, setNewTeamLogo] = useState('');
+  const [newTeamColor, setNewTeamColor] = useState('#334155');
+  const [newTeamSecondaryColor, setNewTeamSecondaryColor] = useState('#ffffff');
   const [newTeamConfederation, setNewTeamConfederation] = useState(CONFEDERATIONS[0]);
   
   const [editingTeam, setEditingTeam] = useState<NationalTeam | null>(null);
   const [editTeamName, setEditTeamName] = useState('');
   const [editTeamLogo, setEditTeamLogo] = useState('');
+  const [editTeamColor, setEditTeamColor] = useState('#334155');
+  const [editTeamSecondaryColor, setEditTeamSecondaryColor] = useState('#ffffff');
   const [editTeamConfederation, setEditTeamConfederation] = useState(CONFEDERATIONS[0]);
   
   const [confirmDemitirTeam, setConfirmDemitirTeam] = useState<NationalTeam | null>(null);
@@ -49,8 +62,8 @@ const NationalTeamsPage: React.FC = () => {
 
   // Global Settings state
   const [transferWindowOpen, setTransferWindowOpen] = useState(true);
-
   const [processing, setProcessing] = useState(false);
+  const [pendingAssumir, setPendingAssumir] = useState<string | null>(null);
 
   const isAdmin = user?.email === 'gnferreira2000@gmail.com';
 
@@ -63,38 +76,26 @@ const NationalTeamsPage: React.FC = () => {
   }, [user, loading, userData, navigate]);
 
   useEffect(() => {
-    const teamsCollectionRef = collection(db, 'national_teams');
-    const unsubscribeTeams = onSnapshot(teamsCollectionRef, (snapshot) => {
-      const teamsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NationalTeam));
-      teamsList.sort((a, b) => a.name.localeCompare(b.name));
-      setTeams(teamsList);
+    const unsubscribeTeams = nationalTeamsCache.subscribe((teamsList) => {
+      setTeams(teamsList as NationalTeam[]);
     });
 
-    const settingsRef = doc(db, 'settings', 'global');
-    const unsubscribeSettings = onSnapshot(settingsRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setTransferWindowOpen(docSnap.data().transferWindowOpen);
+    const unsubscribeSettings = globalSettingsCache.subscribe((data) => {
+      if (data) {
+        setTransferWindowOpen(data.transferWindowOpen);
       }
+    });
+
+    const unsubscribeUsers = usersCache.subscribe((list) => {
+      setAllUsers(list);
     });
 
     return () => {
       unsubscribeTeams();
       unsubscribeSettings();
+      unsubscribeUsers();
     };
   }, []);
-
-  useEffect(() => {
-    let unsubscribeUsers: () => void;
-    if (isAdmin) {
-      const usersRef = collection(db, 'users');
-      unsubscribeUsers = onSnapshot(usersRef, (snap) => {
-        setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      });
-    }
-    return () => {
-      if (unsubscribeUsers) unsubscribeUsers();
-    }
-  }, [isAdmin]);
 
   const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,6 +106,8 @@ const NationalTeamsPage: React.FC = () => {
       await addDoc(teamsCollectionRef, {
         name: newTeamName,
         logoUrl: newTeamLogo,
+        color: newTeamColor,
+        secondaryColor: newTeamSecondaryColor,
         confederation: newTeamConfederation,
         ownerId: null,
         ownerName: null,
@@ -113,6 +116,8 @@ const NationalTeamsPage: React.FC = () => {
       });
       setNewTeamName('');
       setNewTeamLogo('');
+      setNewTeamColor('#334155');
+      setNewTeamSecondaryColor('#ffffff');
       setNewTeamConfederation(CONFEDERATIONS[0]);
       setCreateTeamModalOpen(false);
     } catch (error) {
@@ -130,6 +135,8 @@ const NationalTeamsPage: React.FC = () => {
       await updateDoc(teamRef, {
         name: editTeamName,
         logoUrl: editTeamLogo,
+        color: editTeamColor,
+        secondaryColor: editTeamSecondaryColor,
         confederation: editTeamConfederation
       });
       closeEditModal();
@@ -137,6 +144,20 @@ const NationalTeamsPage: React.FC = () => {
       console.error(error);
     }
     setProcessing(false);
+  };
+
+  const handleEyeDropper = async (setter: React.Dispatch<React.SetStateAction<string>>) => {
+    if ('EyeDropper' in window) {
+      try {
+        const eyeDropper = new (window as any).EyeDropper();
+        const result = await eyeDropper.open();
+        setter(result.sRGBHex);
+      } catch (e) {
+        console.log('EyeDropper cancelled or failed', e);
+      }
+    } else {
+      setAlertMsg({ title: 'Aviso', message: 'Seu navegador não suporta a ferramenta de conta-gotas.', type: 'warning' });
+    }
   };
 
   const handleDeleteTeam = async () => {
@@ -163,6 +184,8 @@ const NationalTeamsPage: React.FC = () => {
     setEditingTeam(team);
     setEditTeamName(team.name);
     setEditTeamLogo(team.logoUrl);
+    setEditTeamColor(team.color || '#334155');
+    setEditTeamSecondaryColor(team.secondaryColor || '#ffffff');
     setEditTeamConfederation(team.confederation || CONFEDERATIONS[0]);
   };
   
@@ -170,6 +193,8 @@ const NationalTeamsPage: React.FC = () => {
     setEditingTeam(null);
     setEditTeamName('');
     setEditTeamLogo('');
+    setEditTeamColor('#334155');
+    setEditTeamSecondaryColor('#ffffff');
     setEditTeamConfederation(CONFEDERATIONS[0]);
   };
 
@@ -202,23 +227,120 @@ const NationalTeamsPage: React.FC = () => {
     setProcessing(false);
   };
 
-  const handleAssumir = async (team: NationalTeam) => {
+  const handleDeclararInteresse = async (team: NationalTeam) => {
     if (processing || !userData) return;
-    if (team.ownerId) return;
-    if (!transferWindowOpen) return;
+    if (team.ownerId || !transferWindowOpen) return;
+    
+    if (userData.declaredInterestTeamId && userData.declaredInterestTeamId !== team.id) {
+      setAlertMsg({ title: 'Atenção', message: 'Você já declarou interesse em outro time/seleção. Cancele o interesse anterior primeiro.', type: 'warning' });
+      return;
+    }
 
     try {
+      setPendingAssumir(team.id);
       const teamRef = doc(db, 'national_teams', team.id);
       const userRef = doc(db, 'users', userData.uid);
-      updateDoc(teamRef, {
-        ownerId: userData.uid,
-        ownerName: userData.name,
-        ownerPhoto: userData.photoURL || null
+
+      const currentInterested = team.interestedUsers || [];
+      if (!currentInterested.includes(userData.uid)) {
+        await updateDoc(teamRef, { interestedUsers: [...currentInterested, userData.uid] });
+      }
+      await updateDoc(userRef, { declaredInterestTeamId: team.id });
+      setPendingAssumir(null);
+    } catch (error: any) {
+      console.error(error);
+      setAlertMsg({ title: 'Erro', message: 'Erro ao declarar interesse.', type: 'error' });
+      setPendingAssumir(null);
+    }
+  };
+
+  const handleCancelarInteresse = async (team: NationalTeam) => {
+    if (processing || !userData) return;
+    try {
+      setPendingAssumir(team.id);
+      const teamRef = doc(db, 'national_teams', team.id);
+      const userRef = doc(db, 'users', userData.uid);
+
+      const currentInterested = team.interestedUsers || [];
+      const updatedInterested = currentInterested.filter(id => id !== userData.uid);
+      
+      await updateDoc(teamRef, { interestedUsers: updatedInterested });
+      await updateDoc(userRef, { declaredInterestTeamId: null });
+      setPendingAssumir(null);
+    } catch (error) {
+      console.error(error);
+      setPendingAssumir(null);
+    }
+  };
+
+  const handleAprovarUnico = async (team: NationalTeam) => {
+    if (!isAdmin || !team.interestedUsers || team.interestedUsers.length !== 1) return;
+    
+    setProcessing(true);
+    try {
+      const teamRef = doc(db, 'national_teams', team.id);
+      
+      const winnerId = team.interestedUsers[0];
+      const winnerUserObj = allUsers.find(u => u.id === winnerId);
+      if (!winnerUserObj) {
+        setProcessing(false);
+        return;
+      }
+      
+      const userRef = doc(db, 'users', winnerId);
+
+      await Promise.all([
+        updateDoc(teamRef, {
+            ownerId: winnerId,
+            ownerName: winnerUserObj.name,
+            ownerPhoto: winnerUserObj.photoURL || null,
+            interestedUsers: []
+        }),
+        updateDoc(userRef, { 
+          nationalTeamId: team.id,
+          declaredInterestTeamId: null
+        })
+      ]);
+    } catch (error: any) {
+      console.error(error);
+      setAlertMsg({ title: 'Erro', message: 'Erro ao aprovar treinador.', type: 'error' });
+    }
+    setProcessing(false);
+  };
+
+  const handleIniciarSorteio = async (team: NationalTeam) => {
+    if (!isAdmin || !team.interestedUsers || team.interestedUsers.length < 2) return;
+    setProcessing(true);
+    try {
+      const participants = team.interestedUsers.map(uid => {
+        const u = allUsers.find(user => user.id === uid);
+        return {
+          uid,
+          name: u?.name || 'Desconhecido',
+          photoURL: u?.photoURL || '',
+          dice1: null,
+          dice2: null,
+          total: null,
+          eliminated: false
+        };
       });
-      updateDoc(userRef, { nationalTeamId: team.id });
+
+      const diceEventRef = doc(db, 'settings', 'dice_event');
+      await setDoc(diceEventRef, {
+        active: true,
+        teamId: team.id,
+        teamName: team.name,
+        teamLogoUrl: team.logoUrl,
+        participants,
+        status: 'waiting',
+        winner: null,
+        round: 1,
+        collectionType: 'national_teams'
+      });
     } catch (error) {
       console.error(error);
     }
+    setProcessing(false);
   };
 
   const executeDemitir = async () => {
@@ -229,12 +351,15 @@ const NationalTeamsPage: React.FC = () => {
     try {
       const teamRef = doc(db, 'national_teams', confirmDemitirTeam.id);
       const userRef = doc(db, 'users', userData.uid);
-      await updateDoc(teamRef, {
-        ownerId: null,
-        ownerName: null,
-        ownerPhoto: null
-      });
-      await updateDoc(userRef, { nationalTeamId: null });
+      
+      await Promise.all([
+        updateDoc(teamRef, {
+          ownerId: null,
+          ownerName: null,
+          ownerPhoto: null
+        }),
+        updateDoc(userRef, { nationalTeamId: null })
+      ]);
       setConfirmDemitirTeam(null);
     } catch (error) {
       console.error(error);
@@ -377,10 +502,10 @@ const NationalTeamsPage: React.FC = () => {
     setProcessing(false);
   };
 
-  const handleBulkDeleteUsers = async () => {
+  const handleBulkFireUsers = async () => {
     if (!isAdmin || selectedUsers.length === 0) return;
-    const confirmDelete = window.confirm(`Tem certeza que deseja excluir ${selectedUsers.length} usuários permanentemente?`);
-    if (!confirmDelete) return;
+    const confirmFire = window.confirm(`Tem certeza que deseja demitir os ${selectedUsers.length} treinadores selecionados?`);
+    if (!confirmFire) return;
     
     setProcessing(true);
     try {
@@ -388,11 +513,8 @@ const NationalTeamsPage: React.FC = () => {
         const u = allUsers.find(x => x.id === userId);
         if (u && u.nationalTeamId) {
           await updateDoc(doc(db, 'national_teams', u.nationalTeamId), { ownerId: null, ownerName: null, ownerPhoto: null });
+          await updateDoc(doc(db, 'users', userId), { nationalTeamId: null });
         }
-        if (u && u.teamId) {
-          await updateDoc(doc(db, 'teams', u.teamId), { ownerId: null, ownerName: null, ownerPhoto: null });
-        }
-        await deleteDoc(doc(db, 'users', userId));
       }
       setSelectedUsers([]);
     } catch (e) {
@@ -437,10 +559,10 @@ const NationalTeamsPage: React.FC = () => {
                   isActive: true
               });
           }
-          alert('Seleções cadastradas com sucesso!');
+          setAlertMsg({ title: 'Sucesso', message: 'Seleções cadastradas com sucesso!', type: 'success' });
       } catch (err) {
           console.error(err);
-          alert('Erro ao cadastrar seleções.');
+          setAlertMsg({ title: 'Erro', message: 'Erro ao cadastrar seleções.', type: 'error' });
       }
       setProcessing(false);
   }
@@ -453,7 +575,6 @@ const NationalTeamsPage: React.FC = () => {
     );
   }
 
-  const hasTeam = !!userData.nationalTeamId;
 
   // Filter visible teams
   const visibleTeams = teams.filter(t => t.isActive !== false);
@@ -553,21 +674,39 @@ const NationalTeamsPage: React.FC = () => {
         {visibleTeams.map(team => {
           const isMyTeam = team.ownerId === userData.uid;
           const canInteractWithMarket = transferWindowOpen;
-          const isAvailable = !team.ownerId && !hasTeam && canInteractWithMarket;
+          const hasDeclaredInterest = userData.declaredInterestTeamId === team.id;
+          const hasDeclaredInterestAny = !!userData.declaredInterestTeamId;
+          const isAvailable = !team.ownerId && !hasDeclaredInterestAny && canInteractWithMarket;
           const isTakenByOther = team.ownerId && !isMyTeam;
+          const interestedList = team.interestedUsers || [];
           
           let cardClass = 'team-card';
-          if (isAvailable) cardClass += ' available';
+          if (isAvailable || hasDeclaredInterest) cardClass += ' available';
           if (isMyTeam) cardClass += ' my-team';
           if (isTakenByOther) cardClass += ' taken-other';
-          if (!team.ownerId && !isAvailable) cardClass += ' unavailable'; 
+          if (!team.ownerId && !isAvailable && !hasDeclaredInterest) cardClass += ' unavailable'; 
           if (isAdmin && team.isActive === false) cardClass += ' inactive-team';
+
+          const color1 = team.color;
+          const color2 = team.secondaryColor || team.color;
+          
+          const dynamicStyle = color1 ? {
+            '--team-color-1': color1,
+            '--team-color-2': color2,
+            border: `1px solid ${color1}40`,
+          } as React.CSSProperties : {};
+
+          const ownerPillStyle = color1 ? {
+            border: `1px solid ${color1}40`,
+            background: 'var(--card-bg)',
+          } : {};
 
           return (
             <div 
               key={team.id} 
               className={cardClass} 
-              onClick={() => isAvailable && handleAssumir(team)}
+              onClick={() => isAvailable ? handleDeclararInteresse(team) : (hasDeclaredInterest ? handleCancelarInteresse(team) : null)}
+              style={dynamicStyle}
             >
               {isAdmin && (
                 <button 
@@ -599,21 +738,31 @@ const NationalTeamsPage: React.FC = () => {
                     style={{ padding: '6px 16px', fontSize: '0.85rem', marginTop: '4px', borderRadius: '20px' }}
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleAssumir(team);
+                      handleDeclararInteresse(team);
                     }}
                   >
-                    Assumir
+                    Declarar Interesse
+                  </button>
+                )}
+
+                {!team.ownerId && hasDeclaredInterest && (
+                  <button 
+                    className="btn-danger" 
+                    style={{ padding: '8px 16px', borderRadius: '24px', fontSize: '0.85rem' }}
+                    onClick={(e) => { e.stopPropagation(); handleCancelarInteresse(team); }}
+                  >
+                    Cancelar Interesse
                   </button>
                 )}
                 
-                {!team.ownerId && !isAvailable && (
+                {!team.ownerId && !isAvailable && !hasDeclaredInterest && !isAdmin && (
                   <div className="lock-icon" title={!transferWindowOpen ? "Janela de transferências fechada" : "Bloqueado"}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
                   </div>
                 )}
                 
                 {team.ownerId && (
-                  <div className="owner-pill">
+                  <div className="owner-pill" style={ownerPillStyle}>
                     {team.ownerPhoto ? (
                       <>
                         <img 
@@ -641,16 +790,20 @@ const NationalTeamsPage: React.FC = () => {
                 
                 {isMyTeam && (
                   canInteractWithMarket ? (
-                    <button 
-                      className="btn-danger" 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setConfirmDemitirTeam(team);
-                      }}
-                      style={{ marginTop: '8px' }}
-                    >
-                      Demitir-se
-                    </button>
+                    pendingAssumir === team.id ? (
+                      <span style={{ marginTop: '8px', fontSize: '0.8rem', color: '#888' }}>Processando...</span>
+                    ) : (
+                      <button 
+                        className="btn-danger" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmDemitirTeam(team);
+                        }}
+                        style={{ marginTop: '8px' }}
+                      >
+                        Demitir-se
+                      </button>
+                    )
                   ) : (
                     <div className="lock-icon" style={{ marginTop: '8px' }} title="Janela de transferências fechada">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
@@ -667,6 +820,53 @@ const NationalTeamsPage: React.FC = () => {
                   >
                     Expulsar
                   </button>
+                )}
+
+                {!team.ownerId && interestedList.length > 0 && (
+                  <div style={{ marginTop: '12px', borderTop: '1px solid var(--border-color)', paddingTop: '8px', width: '100%' }}>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px', textAlign: 'center' }}>
+                      Interessados ({interestedList.length}):
+                    </div>
+                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: isAdmin ? '8px' : '0' }}>
+                      {interestedList.map(uid => {
+                         const u = allUsers.find(x => x.id === uid);
+                         if (!u) return null;
+                         return (
+                           <div key={uid} title={u.name} style={{ display: 'flex', alignItems: 'center' }}>
+                             {u.photoURL ? (
+                               <img src={u.photoURL} alt={u.name} style={{ width: '24px', height: '24px', borderRadius: '50%', objectFit: 'cover' }} referrerPolicy="no-referrer" />
+                             ) : (
+                               <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--primary-color)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem' }}>
+                                 {u.name.charAt(0).toUpperCase()}
+                               </div>
+                             )}
+                           </div>
+                         );
+                      })}
+                    </div>
+                    
+                    {isAdmin && (
+                      <>
+                        {interestedList.length === 1 ? (
+                          <button 
+                            className="btn-primary btn-small" 
+                            onClick={(e) => { e.stopPropagation(); handleAprovarUnico(team); }}
+                            style={{ width: '100%', fontSize: '0.8rem', padding: '6px' }}
+                          >
+                            Aprovar Treinador
+                          </button>
+                        ) : (
+                          <button 
+                            className="btn-primary btn-small" 
+                            onClick={(e) => { e.stopPropagation(); handleIniciarSorteio(team); }}
+                            style={{ width: '100%', fontSize: '0.8rem', padding: '6px', backgroundColor: '#eab308', color: '#000' }}
+                          >
+                            Definir treinador
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -699,6 +899,50 @@ const NationalTeamsPage: React.FC = () => {
                   onChange={(e) => setNewTeamLogo(e.target.value)}
                   disabled={processing}
                 />
+                {newTeamLogo && (
+                  <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    <img src={newTeamLogo} alt="Preview" style={{ width: 60, height: 60, objectFit: 'contain' }} />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Cor Primária</label>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <input 
+                          type="color" 
+                          value={newTeamColor} 
+                          onChange={(e) => setNewTeamColor(e.target.value)} 
+                          style={{ width: '40px', height: '40px', padding: '0', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                        />
+                        <button 
+                          type="button" 
+                          className="btn-secondary btn-small" 
+                          onClick={() => handleEyeDropper(setNewTeamColor)}
+                          title="Usar conta-gotas"
+                        >
+                          Puxar
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Cor Secundária</label>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <input 
+                          type="color" 
+                          value={newTeamSecondaryColor} 
+                          onChange={(e) => setNewTeamSecondaryColor(e.target.value)} 
+                          style={{ width: '40px', height: '40px', padding: '0', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                        />
+                        <button 
+                          type="button" 
+                          className="btn-secondary btn-small" 
+                          onClick={() => handleEyeDropper(setNewTeamSecondaryColor)}
+                          title="Usar conta-gotas"
+                        >
+                          Puxar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="input-group">
                 <label>Confederação</label>
@@ -777,6 +1021,50 @@ const NationalTeamsPage: React.FC = () => {
                   onChange={(e) => setEditTeamLogo(e.target.value)}
                   disabled={processing}
                 />
+                {editTeamLogo && (
+                  <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    <img src={editTeamLogo} alt="Preview" style={{ width: 60, height: 60, objectFit: 'contain' }} />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Cor Primária</label>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <input 
+                          type="color" 
+                          value={editTeamColor} 
+                          onChange={(e) => setEditTeamColor(e.target.value)} 
+                          style={{ width: '40px', height: '40px', padding: '0', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                        />
+                        <button 
+                          type="button" 
+                          className="btn-secondary btn-small" 
+                          onClick={() => handleEyeDropper(setEditTeamColor)}
+                          title="Usar conta-gotas"
+                        >
+                          Puxar
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Cor Secundária</label>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <input 
+                          type="color" 
+                          value={editTeamSecondaryColor} 
+                          onChange={(e) => setEditTeamSecondaryColor(e.target.value)} 
+                          style={{ width: '40px', height: '40px', padding: '0', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                        />
+                        <button 
+                          type="button" 
+                          className="btn-secondary btn-small" 
+                          onClick={() => handleEyeDropper(setEditTeamSecondaryColor)}
+                          title="Usar conta-gotas"
+                        >
+                          Puxar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="input-group">
                 <label>Confederação</label>
@@ -937,104 +1225,154 @@ const NationalTeamsPage: React.FC = () => {
       )}
 
       {/* Modal Gerenciar Treinadores */}
-      {manageUsersModalOpen && (
-        <div className="modal-overlay" onClick={() => setManageUsersModalOpen(false)}>
+      {manageUsersModalOpen && (() => {
+        const filteredUsers = allUsers.filter(u => 
+          (u.name || '').toLowerCase().includes(coachSearchTerm.toLowerCase()) || 
+          (u.email || '').toLowerCase().includes(coachSearchTerm.toLowerCase())
+        );
+
+        return (
+        <div className="modal-overlay" onClick={() => { setManageUsersModalOpen(false); setCoachSearchTerm(''); }}>
           <div className="modal-content large-modal" onClick={(e) => e.stopPropagation()}>
             <h3>Gerenciar Treinadores (Seleções)</h3>
+
+            <div style={{ marginBottom: '15px' }}>
+              <input
+                type="text"
+                placeholder="Buscar treinador..."
+                value={coachSearchTerm}
+                onChange={(e) => setCoachSearchTerm(e.target.value)}
+                className="modal-input"
+                style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #ccc' }}
+              />
+            </div>
             
-            <div className="user-table-container">
-              <table className="user-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: '40px', textAlign: 'center' }}>
+            <div className="user-list">
+              <div className="user-list-header">
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={filteredUsers.length > 0 && selectedUsers.length === filteredUsers.length}
+                    onChange={(e) => {
+                      if (e.target.checked) setSelectedUsers(filteredUsers.map(u => u.id));
+                      else setSelectedUsers([]);
+                    }}
+                  />
+                  Selecionar Todos
+                </label>
+              </div>
+              
+              {filteredUsers.map(u => {
+                const currentTeam = teams.find(t => t.id === u.nationalTeamId);
+                
+                return (
+                  <div key={u.id} className="user-list-card">
+                    <div className="user-card-header">
                       <input 
                         type="checkbox" 
-                        checked={allUsers.length > 0 && selectedUsers.length === allUsers.length}
+                        checked={selectedUsers.includes(u.id)}
                         onChange={(e) => {
-                          if (e.target.checked) setSelectedUsers(allUsers.map(u => u.id));
-                          else setSelectedUsers([]);
+                          if (e.target.checked) setSelectedUsers(prev => [...prev, u.id]);
+                          else setSelectedUsers(prev => prev.filter(id => id !== u.id));
                         }}
                       />
-                    </th>
-                    <th>Treinador</th>
-                    <th>Email</th>
-                    <th>Seleção Atual</th>
-                    <th>Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {allUsers.map(u => {
-                    const currentTeam = teams.find(t => t.id === u.nationalTeamId);
-                    return (
-                      <tr key={u.id}>
-                        <td style={{ textAlign: 'center' }}>
-                          <input 
-                            type="checkbox" 
-                            checked={selectedUsers.includes(u.id)}
+                      <div className="user-row-avatar">
+                        {u.photoURL ? <img src={u.photoURL} referrerPolicy="no-referrer" /> : <div className="default-avatar">{u.name.charAt(0)}</div>}
+                        <div className="user-card-info">
+                          <strong>{u.name}</strong>
+                          <span>{u.email}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="user-card-body">
+                      <div className="user-card-team">
+                        <strong>Time Atual:</strong> {currentTeam ? currentTeam.name : 'Sem Seleção'}
+                      </div>
+                      
+                      <div style={{ display: 'flex', gap: '15px', alignItems: 'center', marginTop: '6px', fontSize: '0.85rem', flexWrap: 'wrap' }}>
+                        <div>
+                          <strong>Prestígio:</strong>{' '}
+                          <input
+                            type="number"
+                            value={u.prestige ?? 100}
                             onChange={(e) => {
-                              if (e.target.checked) setSelectedUsers(prev => [...prev, u.id]);
-                              else setSelectedUsers(prev => prev.filter(id => id !== u.id));
+                              const val = Number(e.target.value);
+                              updateDoc(doc(db, 'users', u.id), { prestige: val });
                             }}
+                            style={{ width: '70px', padding: '2px 6px', borderRadius: '4px', border: '1px solid #ccc', background: 'var(--bg-color)', color: 'var(--text-color)' }}
                           />
-                        </td>
-                        <td>
-                          <div className="user-row-avatar">
-                            {u.photoURL ? <img src={u.photoURL} referrerPolicy="no-referrer" /> : <div className="default-avatar">{u.name.charAt(0)}</div>}
-                            <span>{u.name}</span>
-                          </div>
-                        </td>
-                        <td>{u.email}</td>
-                        <td>{currentTeam ? currentTeam.name : 'Sem Seleção'}</td>
-                        <td>
-                          <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
-                            {currentTeam && (
-                              <button 
-                                className="btn-danger btn-small"
-                                onClick={() => handleForceResign(currentTeam)}
-                                disabled={processing}
-                                title="Remover da seleção"
-                              >
-                                Demitir
-                              </button>
-                            )}
-                            <button 
-                              className="btn-warn btn-small"
-                              style={{ padding: '4px 8px', fontSize: '0.75rem', marginLeft: '4px', marginRight: '4px' }}
-                              onClick={() => handleDeleteUser(u.id, u.nationalTeamId)}
-                              disabled={processing}
-                              title="Excluir Usuário"
+                        </div>
+                        {currentTeam && (
+                          <div>
+                            <strong>Contrato:</strong>{' '}
+                            <select
+                              value={currentTeam.contractYears || 2}
+                              onChange={(e) => {
+                                const val = Number(e.target.value);
+                                const teamRef = doc(db, 'national_teams', currentTeam.id);
+                                updateDoc(teamRef, { contractYears: val, contractStartYear: 2026 });
+                              }}
+                              style={{ padding: '2px 6px', borderRadius: '4px', border: '1px solid #ccc', background: 'var(--bg-color)', color: 'var(--text-color)' }}
                             >
-                              Excluir
-                            </button>
+                              {Array.from({ length: 10 }, (_, i) => i + 1).map(num => (
+                                <option key={num} value={num}>{num} {num === 1 ? 'Ano' : 'Anos'}</option>
+                              ))}
+                            </select>
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                        )}
+                      </div>
+                      
+                      <div className="user-card-actions">
+                        <div className="user-card-buttons">
+                          {currentTeam && (
+                            <button 
+                              className="btn-danger btn-small"
+                              onClick={() => handleForceResign(currentTeam)}
+                              disabled={processing}
+                              title="Remover da seleção"
+                            >
+                              Demitir
+                            </button>
+                          )}
+                          <button 
+                            className="btn-warn btn-small"
+                            onClick={() => handleDeleteUser(u.id, u.nationalTeamId)}
+                            disabled={processing}
+                            title="Excluir Usuário"
+                          >
+                            Excluir
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             {selectedUsers.length > 0 && (
               <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-start' }}>
                 <button 
                   className="btn-warn"
-                  onClick={handleBulkDeleteUsers}
+                  onClick={handleBulkFireUsers}
                   disabled={processing}
                 >
-                  Excluir Selecionados ({selectedUsers.length})
+                  Demitir Selecionados ({selectedUsers.length})
                 </button>
               </div>
             )}
 
             <div className="modal-actions" style={{ marginTop: '24px' }}>
-              <button className="btn-primary" onClick={() => setManageUsersModalOpen(false)} disabled={processing}>
+              <button className="btn-primary" onClick={() => { setManageUsersModalOpen(false); setCoachSearchTerm(''); }} disabled={processing}>
                 Fechar
               </button>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
+      <AlertModal alert={alertMsg} onClose={() => setAlertMsg(null)} />
     </div>
   );
 };

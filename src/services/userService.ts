@@ -8,6 +8,13 @@ export interface UserData {
   photoURL: string;
   teamId: string | null;
   nationalTeamId?: string | null;
+  declaredInterestTeamId?: string | null;
+  prestige?: number;
+  pendingRenewal?: {
+    teamId: string;
+    teamName: string;
+    years: number;
+  } | null;
 }
 
 export const checkAndAddUser = async (user: any): Promise<UserData> => {
@@ -21,10 +28,15 @@ export const checkAndAddUser = async (user: any): Promise<UserData> => {
       email: user.email || '',
       photoURL: user.photoURL || '',
       teamId: null,
+      prestige: 100,
     };
     await setDoc(userRef, newUser);
     return newUser;
   }
   
-  return userDoc.data() as UserData;
+  const data = userDoc.data() as UserData;
+  if (data.prestige === undefined) {
+    data.prestige = 100;
+  }
+  return data;
 };
