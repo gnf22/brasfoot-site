@@ -393,19 +393,19 @@ export const getAdminExpulsionNews = (
   const variations = [
     {
       title: `INTERVENÇÃO DA CGF! ${coachName} é destituído do comando do ${teamName}!`,
-      content: `A Confederação Geral de Futebol (CGF) publicou em boletim oficial o desligamento imediato de ${coachName} do cargo de treinador do ${teamName} na temporada ${year}. O clube passa a buscar um novo comandante no mercado da bola.`
+      content: `A Confederação Gustavo de Futebol (CGF) publicou em boletim oficial o desligamento imediato de ${coachName} do cargo de treinador do ${teamName} na temporada ${year}. O clube passa a buscar um novo comandante no mercado da bola.`
     },
     {
       title: `DECISÃO OFICIAL CGF: ${coachName} é demitido do ${teamName}!`,
-      content: `Por determinação da CGF (Confederação Geral de Futebol), o vínculo profissional de ${coachName} com o ${teamName} foi formalmente rescindido no sistema da liga na temporada ${year}.`
+      content: `Por determinação da CGF (Confederação Gustavo de Futebol), o vínculo profissional de ${coachName} com o ${teamName} foi formalmente rescindido no sistema da liga na temporada ${year}.`
     },
     {
       title: `DEMISSÃO PELA CGF! ${coachName} não é mais treinador do ${teamName}!`,
-      content: `Em nota oficial da Confederação Geral de Futebol (CGF), ${coachName} teve seu contrato com o ${teamName} encerrado administrativamente na temporada ${year}. O cargo de técnico da equipe está vago.`
+      content: `Em nota oficial da Confederação Gustavo de Futebol (CGF), ${coachName} teve seu contrato com o ${teamName} encerrado administrativamente na temporada ${year}. O cargo de técnico da equipe está vago.`
     },
     {
       title: `CANETADA DA CGF! ${coachName} é expulso do comando do ${teamName}!`,
-      content: `A comissão disciplinar e administrativa da CGF decretou o desligamento oficial de ${coachName} do ${teamName}. A diretoria do clube aguarda definições para anunciar seu novo treinador.`
+      content: `A presidência e comissão administrativa da CGF (Confederação Gustavo de Futebol) decretou o desligamento oficial de ${coachName} do ${teamName}. A diretoria do clube aguarda definições para anunciar seu novo treinador.`
     }
   ];
   const choice = variations[Math.floor(Math.random() * variations.length)];
